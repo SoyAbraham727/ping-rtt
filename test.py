@@ -3,8 +3,8 @@ from jnpr.junos import Device
 from junos import Junos_Context
 
 # Constantes
-HOSTS_LIST = ["192.168.1.1", "8.8.8.8", "1.1.1.1"]
-COUNT = 5  # Debe convertirse a str antes de pasarlo a la función
+HOSTS_LIST = ["204.124.107.83", "204.124.107.82", "1.1.1.1"]
+COUNT = 5 
 
 def ping_host(dev, host):
     """Realiza un ping a un host y registra los resultados."""
