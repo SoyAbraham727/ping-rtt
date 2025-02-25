@@ -28,7 +28,7 @@ def convert_bytes(value, unit):
         return round(value / (1024 * 1024), 2)
     elif unit == "GB":
         return round(value / (1024 * 1024 * 1024), 2)
-    return value
+    return round(value, 2)
 
 def log_system_usage():
     """Registra el uso de CPU, memoria y disco en syslog y devuelve los valores corregidos."""
@@ -42,7 +42,7 @@ def log_system_usage():
     disk_percent = round(disk.percent, 2)
     disk_free_gb = convert_bytes(disk.free, "GB")
 
-    message = f"CPU: {cpu_percent}%, Memoria: {mem_used_percent}% ({mem_used_mb} MB usados, {mem_free_mb} MB libres), Disco: {disk_percent}% ({disk_free_gb} GB libres)"
+    message = f"CPU: {cpu_percent:.2f}%, Memoria: {mem_used_percent:.2f}% ({mem_used_mb:.2f} MB usados, {mem_free_mb:.2f} MB libres), Disco: {disk_percent:.2f}% ({disk_free_gb:.2f} GB libres)"
     jcs.syslog("external.error", f"Uso del sistema - {message}")
 
     return cpu_percent, mem_used_percent, mem_used_mb, mem_free_mb, disk_percent, disk_free_gb
@@ -65,7 +65,7 @@ def ping_host(dev, host):
 
     with open(csv_filename, mode='a', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow([host, cpu_percent, mem_percent, mem_used_mb, mem_free_mb, disk_percent, disk_free_gb, time.strftime("%Y-%m-%d %H:%M:%S")])
+        writer.writerow([host, f"{cpu_percent:.2f}", f"{mem_percent:.2f}", f"{mem_used_mb:.2f}", f"{mem_free_mb:.2f}", f"{disk_percent:.2f}", f"{disk_free_gb:.2f}", time.strftime("%Y-%m-%d %H:%M:%S")])
 
 def main():
     """Ejecuta el proceso para cada host y guarda los resultados en CSV."""
@@ -76,7 +76,7 @@ def main():
         
         with open(csv_filename, mode='a', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(["Estado Inicial", initial_cpu, initial_mem, initial_mem_used_mb, initial_mem_free_mb, initial_disk, initial_disk_free_gb, time.strftime("%Y-%m-%d %H:%M:%S")])
+            writer.writerow(["Estado Inicial", f"{initial_cpu:.2f}", f"{initial_mem:.2f}", f"{initial_mem_used_mb:.2f}", f"{initial_mem_free_mb:.2f}", f"{initial_disk:.2f}", f"{initial_disk_free_gb:.2f}", time.strftime("%Y-%m-%d %H:%M:%S")])
 
         for host in HOSTS_LIST:
             jcs.syslog("external.error", f"Procesando host: {host}")
