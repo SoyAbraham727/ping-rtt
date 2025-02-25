@@ -12,3 +12,17 @@ def log_system_usage():
     jcs.syslog("external.error", f"Uso del sistema - {message}")
 
     return cpu_percent, mem_used_percent, disk
+
+writer.writerow([
+    host,
+    f"{cpu_percent:.2f}",
+    f"{mem_percent:.2f}",
+    f"{mem_used_mb:.2f}",
+    f"{mem_free_mb:.2f}",
+    f"{disk_percent:.2f}",
+    f"{disk_free_gb:.2f}",
+    f"{rtt_min:.2f}",
+    f"{rtt_max:.2f}",
+    f"{rtt_avg:.2f}",
+    time.strftime("%Y-%m-%d %H:%M:%S")
+])
