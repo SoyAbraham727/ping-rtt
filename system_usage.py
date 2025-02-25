@@ -13,16 +13,7 @@ def log_system_usage():
 
     return cpu_percent, mem_used_percent, disk
 
-writer.writerow([
-    host,
-    f"{cpu_percent:.2f}",
-    f"{mem_percent:.2f}",
-    f"{mem_used_mb:.2f}",
-    f"{mem_free_mb:.2f}",
-    f"{disk_percent:.2f}",
-    f"{disk_free_gb:.2f}",
-    f"{rtt_min:.2f}",
-    f"{rtt_max:.2f}",
-    f"{rtt_avg:.2f}",
-    time.strftime("%Y-%m-%d %H:%M:%S")
-])
+    # Guardar estado inicial en el CSV
+    with open(csv_filename, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["Estado Inicial", initial_cpu, initial_mem, initial_mem_used_mb, initial_mem_free_mb, initial_disk, initial_disk_free_gb, time.strftime("%Y-%m-%d %H:%M:%S")])
