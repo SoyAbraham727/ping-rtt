@@ -53,9 +53,9 @@ def ping_host(host):
     try:
         with Device() as dev:  # Cada host maneja su propia conexión
             result = dev.rpc.ping(host=host, count=str(COUNT))
-            rtt_min = result.findtext("probe-results-summary/rtt-minimum", "N/A").strip()
-            rtt_max = result.findtext("probe-results-summary/rtt-maximum", "N/A").strip()
-            rtt_avg = result.findtext("probe-results-summary/rtt-average", "N/A").strip()
+            rtt_min = round(float(result.findtext("probe-results-summary/rtt-minimum", "0.0")), 2)
+            rtt_max = round(float(result.findtext("probe-results-summary/rtt-maximum", "0.0")), 2)
+            rtt_avg = round(float(result.findtext("probe-results-summary/rtt-average", "0.0")), 2)
             target_host = result.findtext("target-host", host).strip()
             
             message = (
@@ -67,7 +67,7 @@ def ping_host(host):
     except Exception as e:
         message = f"Ping a {host} falló en {Junos_Context['localtime']}. Error: {e}"
         jcs.syslog("external.crit", f"Error en ping a {host}: {e}")
-        rtt_min, rtt_max, rtt_avg = "N/A", "N/A", "N/A"  # En caso de fallo
+        rtt_min, rtt_max, rtt_avg = 0.00, 0.00, 0.00  # En caso de fallo, valores numéricos con 2 decimales
 
     jcs.syslog("external.crit", message)
 
