@@ -7,20 +7,21 @@ import threading
 import queue
 from jnpr.junos import Device
 
-# Configuración
-LOG_INTERVAL = 1
-COUNT = 5
+# Configuracion
+LOG_INTERVAL = 5
+COUNT = 1
 HOSTS_LIST = ["204.124.107.82"]
 csv_filename = "/var/db/scripts/op/system_monitor.csv"
-MAX_MONITOR_TIME = 10
+MAX_MONITOR_TIME = 60
 
 data_queue = queue.Queue()
 monitoring_done = threading.Event()
 
+# Verificar existencia del archivo CSV y crear encabezados si es necesario
 if not os.path.exists(csv_filename):
     with open(csv_filename, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Timestamp", "CPU (%)", "Memoria (%)", "Memoria Usada (MB)", "Memoria Libre (MB)", "Disco (%)", "Disco Libre (GB)", "Host", "RTT Min (ms)", "RTT Max (ms)", "RTT Prom (ms)"])
+        writer.writerow(["Timestamp", "CPU (%)", "Memoria (%)", "Memoria Usada (MB)", "Memoria Libre (MB)", "Disco (%)", "Disco Libre (GB)", "Host"])
 
 def convert_bytes(value, unit):
     """Convierte bytes a MB o GB."""
@@ -50,10 +51,10 @@ def log_system_usage():
                    f"Disco: {disk_percent}% usado ({disk_free_gb} GB libres)")
         jcs.syslog("external.warning", log_msg)
 
-        data_queue.put([timestamp, cpu_percent, memoria_porcentaje, memoria_usada, memoria_libre, disk_percent, disk_free_gb, None, None, None, None])
+        data_queue.put([timestamp, cpu_percent, memoria_porcentaje, memoria_usada, memoria_libre, disk_percent, disk_free_gb, None])
 
         if time.time() - start_time >= MAX_MONITOR_TIME:
-            jcs.syslog("external.warning", "[MONITOREO] Tiempo máximo alcanzado, deteniendo monitoreo.")
+            jcs.syslog("external.warning", "[MONITOREO] Tiempo maximo alcanzado, deteniendo monitoreo.")
             monitoring_done.set()
             break
 
@@ -66,14 +67,10 @@ def ping_hosts():
         try:
             with Device() as dev:
                 result = dev.rpc.ping(host=host, count=str(COUNT))
-                rtt_min = round(float(result.findtext("probe-results-summary/rtt-minimum", "0.0")), 2)
-                rtt_max = round(float(result.findtext("probe-results-summary/rtt-maximum", "0.0")), 2)
-                rtt_avg = round(float(result.findtext("probe-results-summary/rtt-average", "0.0")), 2)
-                
-                log_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Ping a {host}: Min {rtt_min}ms, Max {rtt_max}ms, Prom {rtt_avg}ms"
+                log_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Ping a {host} completado."
                 jcs.syslog("external.warning", log_msg)
-                
-                data_queue.put([time.strftime("%Y-%m-%d %H:%M:%S"), None, None, None, None, None, None, host, rtt_min, rtt_max, rtt_avg])
+
+                data_queue.put([time.strftime("%Y-%m-%d %H:%M:%S"), None, None, None, None, None, None, host])
         except Exception:
             jcs.syslog("external.critical", f"[ERROR] Fallo en ping a {host}")
 
@@ -92,7 +89,7 @@ def write_to_csv():
     jcs.syslog("external.warning", "[MONITOREO] Escritura en CSV finalizada.")
 
 def main():
-    """Inicia los hilos para la monitorización y escritura en CSV."""
+    """Inicia los hilos para la monitorizacion y escritura en CSV."""
     jcs.syslog("external.warning", "[MONITOREO] Iniciando monitoreo del sistema y red...")
     
     thread_sys = threading.Thread(target=log_system_usage)
@@ -108,7 +105,7 @@ def main():
     thread_sys.join()
     thread_csv.join()
 
-    jcs.syslog("external.warning", "[FINALIZACIÓN] Monitorización completa.")
+    jcs.syslog("external.warning", "[FINALIZACION] Monitorizacion completa.")
 
 if __name__ == "__main__":
     main()
