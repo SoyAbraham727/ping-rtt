@@ -8,14 +8,16 @@ import queue
 from jnpr.junos import Device
 
 # Configuración
-LOG_INTERVAL = 5  # Intervalo de registro en segundos
-COUNT = 1  # Número de pings por host
+LOG_INTERVAL = 1  # Intervalo de registro en segundos
+COUNT = 5  # Número de pings por host
 HOSTS_LIST = ["204.124.107.82"]  # Lista de hosts a monitorear
 csv_filename = "/var/db/scripts/op/system_monitor.csv"
 
 # Cola para almacenar los datos antes de escribir en CSV
 data_queue = queue.Queue()
-ping_done = threading.Event()  # Bandera para indicar finalización de pings
+
+# Bandera de finalización
+monitoring_done = threading.Event()
 
 # Si el archivo no existe, crear con los encabezados
 if not os.path.exists(csv_filename):
@@ -24,16 +26,15 @@ if not os.path.exists(csv_filename):
         writer.writerow(["Timestamp", "CPU (%)", "Memoria (%)", "Memoria Usada (MB)", "Memoria Libre (MB)", "Disco (%)", "Disco Libre (GB)", "Host", "RTT Min (ms)", "RTT Max (ms)", "RTT Prom (ms)"])
 
 def convert_bytes(value, unit):
-    """Convierte bytes a la unidad especificada (MB o GB)."""
-    if value < 0:
-        value = 0  # Evita valores negativos
+    """Convierte bytes a la unidad especificada (MB o GB) asegurando que los valores sean positivos."""
+    value = max(value, 0)  # Asegura que no haya valores negativos
     factor = 1024 * 1024 if unit == "MB" else 1024 * 1024 * 1024
     return round(value / factor, 2)
 
 def log_system_usage():
-    """Registra el uso de CPU, memoria y disco y lo almacena en la cola."""
+    """Registra el uso de CPU, memoria y disco mientras el monitoreo esté activo."""
     jcs.syslog("external.warning", "[MONITOREO] Iniciando monitoreo de recursos del sistema...")
-    while not ping_done.is_set():
+    while not monitoring_done.is_set():
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         cpu_percent = round(psutil.cpu_percent(interval=1), 2)
         mem = psutil.virtual_memory()
@@ -64,42 +65,41 @@ def ping_hosts():
                 rtt_avg = round(float(result.findtext("probe-results-summary/rtt-average", "0.0")), 2)
                 log_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Ping a {host}: Min {rtt_min}ms, Max {rtt_max}ms, Prom {rtt_avg}ms"
                 jcs.syslog("external.warning", log_msg)
+                data_queue.put([time.strftime("%Y-%m-%d %H:%M:%S"), None, None, None, None, None, None, host, rtt_min, rtt_max, rtt_avg])
         except Exception:
-            rtt_min, rtt_max, rtt_avg = 0.00, 0.00, 0.00
             jcs.syslog("external.critical", f"[ERROR] Fallo en ping a {host}")
-        
-        data_queue.put([time.strftime("%Y-%m-%d %H:%M:%S"), None, None, None, None, None, None, host, rtt_min, rtt_max, rtt_avg])
-    
-    ping_done.set()  # Indicar que todos los pings han finalizado
+
+    jcs.syslog("external.warning", "[MONITOREO] Todos los pings han finalizado. Deteniendo monitoreo del sistema...")
+    monitoring_done.set()  # Señala que se deben detener los otros hilos
 
 def write_to_csv():
-    """Escribe los datos almacenados en la cola al archivo CSV."""
+    """Escribe los datos almacenados en la cola al archivo CSV mientras haya datos en la cola."""
     jcs.syslog("external.warning", "[MONITOREO] Iniciando escritura de datos en CSV...")
-    while not ping_done.is_set() or not data_queue.empty():
+    while not monitoring_done.is_set() or not data_queue.empty():
         while not data_queue.empty():
             with open(csv_filename, mode='a', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(data_queue.get())
         time.sleep(1)
+    jcs.syslog("external.warning", "[MONITOREO] Escritura en CSV finalizada.")
 
 def main():
     """Inicia los hilos para la monitorización y escritura en CSV."""
     jcs.syslog("external.warning", "[MONITOREO] Iniciando monitoreo del sistema y red...")
     
-    thread_sys = threading.Thread(target=log_system_usage, daemon=True)
-    thread_ping = threading.Thread(target=ping_hosts, daemon=True)
-    thread_csv = threading.Thread(target=write_to_csv, daemon=True)
-    
+    thread_sys = threading.Thread(target=log_system_usage)
+    thread_ping = threading.Thread(target=ping_hosts)
+    thread_csv = threading.Thread(target=write_to_csv)
+
     thread_sys.start()
     thread_ping.start()
     thread_csv.start()
-    
-    try:
-        thread_sys.join()
-        thread_ping.join()
-        thread_csv.join()
-    except KeyboardInterrupt:
-        jcs.syslog("external.critical", "[FINALIZACIÓN] Monitorización terminada manualmente")
+
+    thread_ping.join()  # Esperar a que finalicen los pings
+    thread_sys.join()   # Termina cuando monitoring_done está en True
+    thread_csv.join()   # Termina cuando ya no haya datos en la cola
+
+    jcs.syslog("external.warning", "[FINALIZACIÓN] Monitorización completa.")
 
 if __name__ == "__main__":
     main()
