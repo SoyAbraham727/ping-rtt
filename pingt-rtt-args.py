@@ -8,13 +8,13 @@ import threading
 import queue
 from jnpr.junos import Device
 
-# Argumentos de línea de comandos
+# Argumentos de linea de comandos
 parser = argparse.ArgumentParser(description="Monitoreo de recursos y conectividad de red.")
-parser.add_argument("--count", type=int, default=1, help="Número de paquetes de ping")
-parser.add_argument("--max_time", type=int, default=60, help="Tiempo máximo de monitoreo en segundos")
+parser.add_argument("--count", type=int, default=1, help="Numero de paquetes de ping")
+parser.add_argument("--max_time", type=int, default=60, help="Tiempo maximo de monitoreo en segundos")
 args = parser.parse_args()
 
-# Configuración
+# Configuracion
 LOG_INTERVAL = 5
 COUNT = args.count
 MAX_MONITOR_TIME = args.max_time
@@ -37,13 +37,13 @@ def convert_bytes(value, unit):
 
 def log_system_usage():
     """Registra CPU, memoria y disco."""
-    jcs.syslog("external.warning", "[MONITOREO] Iniciando monitoreo de recursos del sistema...")
     start_time = time.time()
-    
+    jcs.syslog("external.warning", "[MONITOREO] Iniciando monitoreo de recursos del sistema...")
+
     while not monitoring_done.is_set():
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         cpu_percent = round(psutil.cpu_percent(interval=1), 3)
-        
+
         mem = psutil.virtual_memory()
         memoria_usada = convert_bytes(mem.used, "MB")
         memoria_libre = convert_bytes(mem.available, "MB")
@@ -60,7 +60,7 @@ def log_system_usage():
         data_queue.put([timestamp, cpu_percent, memoria_porcentaje, memoria_usada, memoria_libre, disk_percent, disk_free_gb, None])
 
         if time.time() - start_time >= MAX_MONITOR_TIME:
-            jcs.syslog("external.warning", "[MONITOREO] Tiempo máximo alcanzado, deteniendo monitoreo.")
+            jcs.syslog("external.warning", "[MONITOREO] Tiempo maximo alcanzado, deteniendo monitoreo.")
             monitoring_done.set()
             break
 
@@ -95,9 +95,11 @@ def write_to_csv():
     jcs.syslog("external.warning", "[MONITOREO] Escritura en CSV finalizada.")
 
 def main():
-    """Inicia los hilos para la monitorización y escritura en CSV."""
+    """Inicia los hilos para la monitorizacion y escritura en CSV."""
     jcs.syslog("external.warning", "[MONITOREO] Iniciando monitoreo del sistema y red...")
-    
+
+    start_time = time.time()  # Iniciar temporizador
+
     thread_sys = threading.Thread(target=log_system_usage)
     thread_ping = threading.Thread(target=ping_hosts)
     thread_csv = threading.Thread(target=write_to_csv)
@@ -111,7 +113,8 @@ def main():
     thread_sys.join()
     thread_csv.join()
 
-    jcs.syslog("external.warning", "[FINALIZACIÓN] Monitorización completa.")
+    total_time = round(time.time() - start_time, 3)  # Calcular tiempo total
+    jcs.syslog("external.warning", f"[FINALIZACION] Monitorizacion completa en {total_time} segundos.")
 
 if __name__ == "__main__":
     main()
