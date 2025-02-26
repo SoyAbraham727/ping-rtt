@@ -29,7 +29,9 @@ def convert_bytes(value, unit):
 
 def log_system_usage():
     """Registra el uso de CPU, memoria y disco y lo almacena en la cola."""
+    jcs.syslog("external.warning", "Iniciando monitoreo de recursos del sistema...")
     while True:
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         cpu_percent = round(psutil.cpu_percent(interval=1), 2)
         mem = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
@@ -39,13 +41,17 @@ def log_system_usage():
         mem_free_mb = convert_bytes(mem.free, "MB")
         disk_percent = round(disk.percent, 2)
         disk_free_gb = convert_bytes(disk.free, "GB")
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        
+
+        log_msg = (f"[{timestamp}] CPU: {cpu_percent}%, Memoria: {mem_used_percent}% ({mem_used_mb} MB usados, {mem_free_mb} MB libres), "
+                   f"Disco: {disk_percent}% usado ({disk_free_gb} GB libres)")
+        jcs.syslog("external.warning", log_msg)
+
         data_queue.put([timestamp, cpu_percent, mem_used_percent, mem_used_mb, mem_free_mb, disk_percent, disk_free_gb, None, None, None, None])
         time.sleep(LOG_INTERVAL)
 
 def ping_hosts():
     """Realiza pings a los hosts y almacena los resultados en la cola."""
+    jcs.syslog("external.warning", "Iniciando monitoreo de conectividad de red...")
     while True:
         for host in HOSTS_LIST:
             try:
@@ -54,8 +60,11 @@ def ping_hosts():
                     rtt_min = round(float(result.findtext("probe-results-summary/rtt-minimum", "0.0")), 2)
                     rtt_max = round(float(result.findtext("probe-results-summary/rtt-maximum", "0.0")), 2)
                     rtt_avg = round(float(result.findtext("probe-results-summary/rtt-average", "0.0")), 2)
+                    log_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Ping a {host}: Min {rtt_min}ms, Max {rtt_max}ms, Prom {rtt_avg}ms"
+                    jcs.syslog("external.warning", log_msg)
             except Exception:
                 rtt_min, rtt_max, rtt_avg = 0.00, 0.00, 0.00
+                jcs.syslog("external.critical", f"Error en ping a {host}")
             
             data_queue.put([time.strftime("%Y-%m-%d %H:%M:%S"), None, None, None, None, None, None, host, rtt_min, rtt_max, rtt_avg])
         
@@ -63,6 +72,7 @@ def ping_hosts():
 
 def write_to_csv():
     """Escribe los datos almacenados en la cola al archivo CSV."""
+    jcs.syslog("external.warning", "Iniciando escritura de datos en CSV...")
     while True:
         while not data_queue.empty():
             with open(csv_filename, mode='a', newline='') as file:
@@ -72,7 +82,7 @@ def write_to_csv():
 
 def main():
     """Inicia los hilos para la monitorización y escritura en CSV."""
-    jcs.syslog("external.error", "Iniciando monitorización del sistema con ping en paralelo")
+    jcs.syslog("external.warning", "Iniciando monitoreo del sistema y red...")
     
     thread_sys = threading.Thread(target=log_system_usage, daemon=True)
     thread_ping = threading.Thread(target=ping_hosts, daemon=True)
@@ -82,11 +92,12 @@ def main():
     thread_ping.start()
     thread_csv.start()
     
-    thread_sys.join()
-    thread_ping.join()
-    thread_csv.join()
-    
-    jcs.syslog("external.error", "Monitorización finalizada")
+    try:
+        thread_sys.join()
+        thread_ping.join()
+        thread_csv.join()
+    except KeyboardInterrupt:
+        jcs.syslog("external.critical", "Monitorización finalizada manualmente")
 
 if __name__ == "__main__":
     main()
