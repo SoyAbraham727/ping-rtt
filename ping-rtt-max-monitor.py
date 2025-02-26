@@ -37,8 +37,8 @@ def get_system_usage():
     cpu_percent = round(psutil.cpu_percent(interval=1), 2)
     
     mem = psutil.virtual_memory()
-    mem_percent = round((mem.used / (mem.used + mem.available)) * 100, 2)  # Cálculo correcto de memoria
-
+    mem_percent = round((mem.used / mem.total) * 100, 2) if mem.total > 0 else 0.00
+    
     disk = psutil.disk_usage('/')
     disk_percent = round(disk.percent, 2)
     
