@@ -12,6 +12,7 @@ LOG_INTERVAL = 1  # Intervalo de registro en segundos
 COUNT = 5  # Número de pings por host
 HOSTS_LIST = ["204.124.107.82"]  # Lista de hosts a monitorear
 csv_filename = "/var/db/scripts/op/system_monitor.csv"
+MAX_MONITOR_TIME = 5  # Tiempo máximo de monitoreo en segundos
 
 # Cola para almacenar los datos antes de escribir en CSV
 data_queue = queue.Queue()
@@ -19,21 +20,23 @@ data_queue = queue.Queue()
 # Bandera de finalización
 monitoring_done = threading.Event()
 
-# Si el archivo no existe, crear con los encabezados
+# Si el archivo no existe, crearlo con encabezados
 if not os.path.exists(csv_filename):
     with open(csv_filename, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(["Timestamp", "CPU (%)", "Memoria (%)", "Memoria Usada (MB)", "Memoria Libre (MB)", "Disco (%)", "Disco Libre (GB)", "Host", "RTT Min (ms)", "RTT Max (ms)", "RTT Prom (ms)"])
 
 def convert_bytes(value, unit):
-    """Convierte bytes a la unidad especificada (MB o GB) asegurando que los valores sean positivos."""
-    value = max(value, 0)  # Asegura que no haya valores negativos
+    """Convierte bytes a la unidad especificada (MB o GB), evitando valores negativos."""
+    value = max(value, 0)  
     factor = 1024 * 1024 if unit == "MB" else 1024 * 1024 * 1024
     return round(value / factor, 2)
 
 def log_system_usage():
     """Registra el uso de CPU, memoria y disco mientras el monitoreo esté activo."""
     jcs.syslog("external.warning", "[MONITOREO] Iniciando monitoreo de recursos del sistema...")
+    start_time = time.time()
+    
     while not monitoring_done.is_set():
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         cpu_percent = round(psutil.cpu_percent(interval=1), 2)
@@ -51,6 +54,13 @@ def log_system_usage():
         jcs.syslog("external.warning", log_msg)
 
         data_queue.put([timestamp, cpu_percent, mem_used_percent, mem_used_mb, mem_free_mb, disk_percent, disk_free_gb, None, None, None, None])
+
+        # Salir si se supera el tiempo máximo
+        if time.time() - start_time >= MAX_MONITOR_TIME:
+            jcs.syslog("external.warning", "[MONITOREO] Tiempo máximo alcanzado, deteniendo monitoreo del sistema.")
+            monitoring_done.set()
+            break
+
         time.sleep(LOG_INTERVAL)
 
 def ping_hosts():
@@ -70,7 +80,7 @@ def ping_hosts():
             jcs.syslog("external.critical", f"[ERROR] Fallo en ping a {host}")
 
     jcs.syslog("external.warning", "[MONITOREO] Todos los pings han finalizado. Deteniendo monitoreo del sistema...")
-    monitoring_done.set()  # Señala que se deben detener los otros hilos
+    monitoring_done.set()
 
 def write_to_csv():
     """Escribe los datos almacenados en la cola al archivo CSV mientras haya datos en la cola."""
@@ -96,8 +106,9 @@ def main():
     thread_csv.start()
 
     thread_ping.join()  # Esperar a que finalicen los pings
-    thread_sys.join()   # Termina cuando monitoring_done está en True
-    thread_csv.join()   # Termina cuando ya no haya datos en la cola
+    monitoring_done.set()  # Asegurar que el monitoreo del sistema también se detenga
+    thread_sys.join()   # Asegurar que el monitoreo del sistema finalice
+    thread_csv.join()   # Asegurar que la escritura en CSV termine correctamente
 
     jcs.syslog("external.warning", "[FINALIZACIÓN] Monitorización completa.")
 
