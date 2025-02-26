@@ -19,7 +19,7 @@ MAX_MONITOR_TIME = args.max_time
 LOG_INTERVAL = 1
 csv_filename = "/var/db/scripts/op/system_monitor.csv"
 
-# Lista de hosts LIS
+# Lista de hosts
 HOSTS_LIST = ["204.124.107.82", "204.124.107.83", "204.124.107.84"]
 
 data_queue = queue.Queue()
@@ -29,17 +29,22 @@ monitoring_done = threading.Event()
 if not os.path.exists(csv_filename):
     with open(csv_filename, mode="w", newline="") as file:
         writer = csv.writer(file)
-        writer.writerow(["Timestamp", "CPU (%)", "Memoria (%)", "Disco (%)", "Host", "Ping"])
+        writer.writerow(["Timestamp", "CPU (%)", "Memoria (%)", "Memoria Usada (MB)", "Memoria Disponible (MB)", "Disco (%)", "Host", "Ping"])
 
 def get_system_usage():
     """Obtiene métricas del sistema (CPU, Memoria y Disco)."""
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     cpu_percent = round(psutil.cpu_percent(interval=1), 2)
+    
     mem = psutil.virtual_memory()
     mem_percent = round(mem.percent, 2)
+    mem_used_mb = round(mem.used / (1024 * 1024), 2)
+    mem_available_mb = round(mem.available / (1024 * 1024), 2)
+    
     disk = psutil.disk_usage('/')
     disk_percent = round(disk.percent, 2)
-    return timestamp, cpu_percent, mem_percent, disk_percent
+    
+    return timestamp, cpu_percent, mem_percent, mem_used_mb, mem_available_mb, disk_percent
 
 def log_system_usage():
     """Registra el uso del sistema en logs y lo guarda en la cola."""
@@ -47,12 +52,12 @@ def log_system_usage():
     jcs.syslog("external.warning", "[MONITOREO] Iniciando monitoreo...")
 
     while not monitoring_done.is_set():
-        timestamp, cpu_percent, mem_percent, disk_percent = get_system_usage()
-        log_msg = f"[{timestamp}] CPU: {cpu_percent}%, Memoria: {mem_percent}%, Disco: {disk_percent}%"
+        timestamp, cpu_percent, mem_percent, mem_used_mb, mem_available_mb, disk_percent = get_system_usage()
+        log_msg = f"[{timestamp}] CPU: {cpu_percent}%, Memoria: {mem_percent}% (Usada: {mem_used_mb}MB, Disponible: {mem_available_mb}MB), Disco: {disk_percent}%"
         jcs.syslog("external.warning", log_msg)
 
         for host in HOSTS_LIST:
-            data_queue.put((timestamp, cpu_percent, mem_percent, disk_percent, host, "N/A"))
+            data_queue.put((timestamp, cpu_percent, mem_percent, mem_used_mb, mem_available_mb, disk_percent, host, "N/A"))
 
         if time.time() - start_time >= MAX_MONITOR_TIME:
             jcs.syslog("external.warning", "[MONITOREO] Tiempo máximo alcanzado, deteniendo monitoreo.")
@@ -73,9 +78,9 @@ def ping_host(dev, host):
         return "Fallo"
 
 def write_to_csv():
-    """Escribe los datos en el archivo CSV."""
+    """Escribe los datos en el archivo CSV en tiempo real."""
     jcs.syslog("external.warning", "[MONITOREO] Iniciando escritura en CSV...")
-    
+
     while not monitoring_done.is_set() or not data_queue.empty():
         while not data_queue.empty():
             try:
@@ -85,7 +90,7 @@ def write_to_csv():
             except Exception as e:
                 jcs.syslog("external.error", f"Error al escribir en CSV: {str(e)}")
         time.sleep(1)
-    
+
     jcs.syslog("external.warning", "[MONITOREO] Escritura en CSV finalizada.")
 
 def main():
@@ -105,15 +110,17 @@ def main():
 
         for host in HOSTS_LIST:
             ping_result = ping_host(dev, host)
-            timestamp, cpu_percent, mem_percent, disk_percent = get_system_usage()
-            data_queue.put((timestamp, cpu_percent, mem_percent, disk_percent, host, ping_result))
+            timestamp, cpu_percent, mem_percent, mem_used_mb, mem_available_mb, disk_percent = get_system_usage()
+            data_queue.put((timestamp, cpu_percent, mem_percent, mem_used_mb, mem_available_mb, disk_percent, host, ping_result))
 
         dev.close()
     except Exception as e:
         jcs.syslog("external.crit", f"Error al conectar con JUNOS: {str(e)}")
 
-    thread_sys.join()
+    # Finaliza monitoreo cuando terminan los pings
     monitoring_done.set()
+    
+    thread_sys.join()
     thread_csv.join()
 
     total_time = round(time.time() - start_time, 3)
