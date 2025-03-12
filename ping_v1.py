@@ -1,15 +1,10 @@
 import jcs
-import psutil
 from jnpr.junos import Device
 from junos import Junos_Context
 
 # Constantes
 HOSTS_LIST = [
-    "31.13.89.19",
-    "157.240.25.",
-    "157.240.25.",
-    "31.13.89.52",
-    "157.240.19."
+    "201.154.139.1"
     ]
 
 COUNT = 5 
