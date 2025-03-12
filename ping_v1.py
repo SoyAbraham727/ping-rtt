@@ -6,7 +6,6 @@ import time
 from jnpr.junos import Device
 from junos import Junos_Context
 
-
 parser = argparse.ArgumentParser(description="Script para ping con RTT en Juniper")
 parser.add_argument("--count", type=int, required=True, help="Número de paquetes de ping por host")
 args = parser.parse_args()
@@ -48,23 +47,24 @@ def ping_host(dev, host):
         log_error(f"Fallo el ping a {host} | Hora: {Junos_Context.get('localtime', 'N/A')} | Detalle: {str(e)}")
 
 def run_ping_tests():
-    """Conecta al equipo y realiza pruebas de conectividad."""
-    log_warning("Conectando con el dispositivo Juniper...")
+    """Realiza pruebas de conectividad desde el equipo local (on-box)."""
+    log_warning("Ejecutando script on-box, inicializando RPC...")
 
     start_time = time.time()
     try:
-        with Device(timeout=TIMEOUT_RPC) as dev:
-            log_warning("Conexión establecida correctamente")
-            log_warning(f"Timeout RPC por defecto: {dev.timeout} segundos")
+        dev = Device()
+        dev.timeout = TIMEOUT_RPC  # ✅ Aquí ajustas el timeout directamente
 
-            for host in HOSTS_LIST:
-                log_warning(f"Procesando host: {host}")
-                ping_host(dev, host)
+        for host in HOSTS_LIST:
+            log_warning(f"Procesando host: {host}")
+            ping_host(dev, host)
 
-            log_warning("Finalización de pruebas de conectividad")
+        log_warning("Finalización de pruebas de conectividad")
 
     except Exception as e:
-        log_error(f"No se pudo conectar con el dispositivo: {str(e)}")
+        import traceback
+        log_error(f"No se pudo ejecutar el RPC: {str(e)}")
+        log_error(f"Detalle: {traceback.format_exc()}")
 
     total_time = round(time.time() - start_time, 2)
     log_warning(f"Tiempo total de ejecución: {total_time} segundos")
