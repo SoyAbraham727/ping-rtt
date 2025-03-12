@@ -14,7 +14,9 @@ COUNT = args.count
 
 # Lista fija de hosts
 HOSTS_LIST = [
-    "201.154.139.1"
+    "201.154.139.1",
+    "8.8.8.8",
+    "1.1.1.1"
 ]
 
 # Funciones de logging
@@ -56,6 +58,7 @@ def run_ping_tests():
     try:
         with Device() as dev:
             log_warn("Conexión establecida correctamente.")
+            log_warn(f"Timeout RPC por defecto: {dev.timeout} segundos") 
 
             for host in HOSTS_LIST:
                 log_warn(f"Procesando host: {host}")
