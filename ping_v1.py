@@ -1,4 +1,5 @@
 import jcs
+import time
 from jnpr.junos import Device
 from junos import Junos_Context
 
@@ -22,33 +23,35 @@ def ping_host(dev, host):
         
         message = (
             f"RTT para {target_host} a las {Junos_Context['localtime']} | "
-            f"Mín: {rtt_min} ms, Máx: {rtt_max} ms, Prom: {rtt_avg} ms"
+            f"Min: {rtt_min} ms, Máx: {rtt_max} ms, Prom: {rtt_avg} ms"
         )
         jcs.syslog("external.error", f"Ping exitoso a {target_host}")
     except Exception as e:
-        message = f"Ping a {host} falló en {Junos_Context['localtime']}. Error: {e}"
+        message = f"Ping a {host} fallo en {Junos_Context['localtime']}. Error: {e}"
         jcs.syslog("external.crit", f"Error en ping a {host}: {e}")
     
     jcs.syslog("external.crit", message)
 
 def main():
-    """Establece conexión con el dispositivo y ejecuta pings a los hosts."""
-    jcs.syslog("external.error", "Iniciando conexión con el dispositivo Juniper")
+    """Establece conexion con el dispositivo y ejecuta pings a los hosts."""
+    jcs.syslog("external.error", "Iniciando conexion con el dispositivo Juniper")
+    start_time = time.time()
 
     try:
         with Device() as dev:
-            jcs.syslog("external.error", "Conexión establecida con éxito")
+            jcs.syslog("external.error", "Conexion establecida con exito")
 
             for host in HOSTS_LIST:
                 jcs.syslog("external.error", f"Procesando host: {host}")
                 ping_host(dev, host)
             
-            jcs.syslog("external.error", "Finalización de pruebas de ping")
+            jcs.syslog("external.error", "Finalizacion de pruebas de ping")
     
     except Exception as e:
         jcs.syslog("external.crit", f"Error al conectar con el dispositivo: {e}")
     
-    jcs.syslog("external.error", "Ejecución del script finalizada")
+    total_time = round(time.time() - start_time, 3)
+    jcs.syslog("external.error", f"[FINALIZACION] Ejecucion del script finalizada en {total_time}")
 
 if __name__ == "__main__":
     main()
