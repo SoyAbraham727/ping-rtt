@@ -15,14 +15,13 @@ COUNT = args.count
 
 # ------------------ Lista de Hosts ------------------
 HOSTS_LIST = [
-    "201.154.139.1",
-    "8.8.8.8"
+    "201.154.139.1"
 ]
 
 # ------------------ Funciones de log ------------------
 def log_syslog(message, level="info"):
     level_map = {
-        "info": "external.info",
+        "info": "external.warn",
         "warn": "external.warn",
         "error": "external.crit"
     }
@@ -58,6 +57,8 @@ def main():
     log_syslog("Iniciando pruebas de conectividad (on-box)...", level="info")
     output_messages = []
 
+    start_time = time.time()
+
     try:
         dev = Device()
         dev.open()
@@ -68,18 +69,13 @@ def main():
             output_messages.append(msg)
 
         dev.close()
+        end_time = time.time()
+        time_duration = round(end_time - start_time, 2)
         log_syslog("Conexión cerrada con el dispositivo", level="info")
+        log_syslog(f"Tiempo total de ejecucion : {time_duration} segundos", level="info")
 
     except Exception as e:
         log_syslog(f"[ERROR] No se pudo conectar con el dispositivo: {str(e)}", level="error")
-
-    # ------------------ Guardar en archivo ------------------
-    try:
-        with open("/var/tmp/resultados_ping.txt", "w") as file:
-            for line in output_messages:
-                file.write(line + "\n")
-    except Exception as e:
-        log_syslog(f"[ERROR] No se pudo escribir en archivo: {str(e)}", level="error")
 
 # ------------------ Punto de entrada ------------------
 if __name__ == "__main__":
