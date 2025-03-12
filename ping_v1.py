@@ -4,7 +4,7 @@ import argparse
 from jnpr.junos import Device
 from junos import Junos_Context
 
-# Lista de hosts a los que se les hará ping
+# Lista de hosts a los que se les hara ping
 HOSTS_LIST = [
     "201.154.139.1"
 ]
@@ -22,28 +22,28 @@ def ping_host(dev, host, count):
         
         message = (
             f"[PING] Resultado para {target_host} a las {Junos_Context['localtime']} | "
-            f"Min: {rtt_min} ms, Máx: {rtt_max} ms, Prom: {rtt_avg} ms"
+            f"Min: {rtt_min} ms, Max: {rtt_max} ms, Prom: {rtt_avg} ms"
         )
         jcs.syslog("external.info", message)
     
     except Exception as e:
-        error_msg = f"[ERROR] Ping a {host} falló a las {Junos_Context['localtime']}. Detalle: {str(e)}"
+        error_msg = f"[ERROR] Ping a {host} fallo a las {Junos_Context['localtime']}. Detalle: {str(e)}"
         jcs.syslog("external.crit", error_msg)
 
 def main():
     # Parseo de argumentos
     parser = argparse.ArgumentParser(description="Script para hacer ping a hosts desde dispositivo Juniper")
-    parser.add_argument("--count", type=int, default=5, help="Número de paquetes a enviar en cada ping (default: 5)")
+    parser.add_argument("--count", type=int, default=5, help="Numero de paquetes a enviar en cada ping (default: 5)")
     args = parser.parse_args()
 
     count = args.count
 
-    jcs.syslog("external.info", "[INICIO] Estableciendo conexión con el dispositivo Juniper...")
+    jcs.syslog("external.info", "[INICIO] Estableciendo conexion con el dispositivo Juniper...")
     start_time = time.time()
 
     try:
         with Device() as dev:
-            jcs.syslog("external.info", "[OK] Conexión establecida exitosamente.")
+            jcs.syslog("external.info", "[OK] Conexion establecida exitosamente.")
 
             for host in HOSTS_LIST:
                 jcs.syslog("external.info", f"[PROCESO] Ejecutando ping para host: {host}")
@@ -52,10 +52,10 @@ def main():
             jcs.syslog("external.info", "[FIN] Pruebas de conectividad finalizadas.")
     
     except Exception as e:
-        jcs.syslog("external.crit", f"[ERROR] No se pudo establecer conexión con el dispositivo: {str(e)}")
+        jcs.syslog("external.crit", f"[ERROR] No se pudo establecer conexion con el dispositivo: {str(e)}")
 
     total_time = round(time.time() - start_time, 3)
-    jcs.syslog("external.info", f"[FINALIZACIÓN] Tiempo total de ejecución: {total_time} segundos.")
+    jcs.syslog("external.info", f"[FINALIZACION] Tiempo total de ejecucion: {total_time} segundos.")
 
 if __name__ == "__main__":
     main()
