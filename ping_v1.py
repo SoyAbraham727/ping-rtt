@@ -1,79 +1,72 @@
+#!/usr/bin/env python
+
+import argparse
 import jcs
 import time
-import argparse
 from jnpr.junos import Device
 from junos import Junos_Context
 
-# Configuración de argumentos
-parser = argparse.ArgumentParser(description="Script para realizar pings a hosts desde dispositivo Juniper.")
-parser.add_argument("--count", type=int, default=1, help="Número de pings por host.")
-args = parser.parse_args()
-
-# Variables globales
-COUNT = args.count
-
 # Lista fija de hosts
 HOSTS_LIST = [
-    "201.154.139.1",
-    "8.8.8.8",
-    "1.1.1.1"
+    "201.154.139.1"
 ]
 
 # Funciones de logging
-def log_warn(message):
-    jcs.syslog("external.warn", f"[INFO] {message}")
+def log_warning(message):
+    jcs.syslog("external.warn", f"[WARNING] {message}")
 
 def log_error(message):
     jcs.syslog("external.crit", f"[ERROR] {message}")
 
-# Función para ejecutar ping
-def ping_host(dev, host):
-    log_warn(f"Iniciando ping a {host} con {COUNT} paquetes...")
+def ping_host(dev, host, count):
+    """Realiza ping y muestra RTT detallado."""
+    log_warning(f"Iniciando ping a {host} con {count} paquetes")
 
     try:
-        result = dev.rpc.ping(host=host, count=str(COUNT))
+        result = dev.rpc.ping(host=host, count=str(count))
 
         target_host = result.findtext("target-host", host).strip()
         rtt_min = result.findtext("probe-results-summary/rtt-minimum", "N/A").strip()
         rtt_max = result.findtext("probe-results-summary/rtt-maximum", "N/A").strip()
         rtt_avg = result.findtext("probe-results-summary/rtt-average", "N/A").strip()
-        timestamp = str(Junos_Context.get("localtime", "N/A"))
 
         message = (
-            f"RTT details for host {target_host} at time {timestamp} | "
-            f"Minimum = {rtt_min} ms | Maximum = {rtt_max} ms | Average = {rtt_avg} ms"
+            f"Ping a {target_host} | Hora: {Junos_Context.get('localtime', 'N/A')} | "
+            f"Min: {rtt_min} ms | Max: {rtt_max} ms | Prom: {rtt_avg} ms"
         )
-
-        log_warn(message)
+        log_warning(message)
 
     except Exception as e:
-        error_msg = f"Ping failed to {host} at time {Junos_Context.get('localtime', 'N/A')}. Error: {str(e)}"
-        log_error(error_msg)
+        log_error(f"Fallo el ping a {host} | Hora: {Junos_Context.get('localtime', 'N/A')} | Detalle: {str(e)}")
 
-# Función principal de ejecución
-def run_ping_tests():
-    log_warn("Conectando al dispositivo Juniper...")
+def run_ping_tests(count):
+    """Conecta al equipo y realiza pruebas de conectividad."""
+    log_warning("Conectando con el dispositivo Juniper...")
+
     start_time = time.time()
-
     try:
         with Device() as dev:
-            log_warn("Conexión establecida correctamente.")
-            log_warn(f"Timeout RPC por defecto: {dev.timeout} segundos") 
+            log_warning("Conexión establecida correctamente")
+            log_warning(f"Timeout RPC por defecto: {dev.timeout} segundos")
 
             for host in HOSTS_LIST:
-                log_warn(f"Procesando host: {host}")
-                ping_host(dev, host)
+                log_warning(f"Procesando host: {host}")
+                ping_host(dev, host, count)
 
-            log_warn("Pruebas de conectividad finalizadas.")
+            log_warning("Finalización de pruebas de conectividad")
+
     except Exception as e:
-        log_error(f"No se pudo conectar al dispositivo: {str(e)}")
+        log_error(f"No se pudo conectar con el dispositivo: {str(e)}")
 
     total_time = round(time.time() - start_time, 2)
-    log_warn(f"Tiempo total de ejecución: {total_time} segundos.")
+    log_warning(f"Tiempo total de ejecución: {total_time} segundos")
 
-# Main
 def main():
-    run_ping_tests()
+    parser = argparse.ArgumentParser(description="Script para ping con RTT en Juniper")
+    parser.add_argument("-count", type=int, required=True, help="Número de paquetes de ping por host")
+    args = parser.parse_args()
+
+    run_ping_tests(args.count)
 
 if __name__ == "__main__":
     main()
