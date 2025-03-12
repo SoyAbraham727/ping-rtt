@@ -6,6 +6,14 @@ import time
 from jnpr.junos import Device
 from junos import Junos_Context
 
+
+parser = argparse.ArgumentParser(description="Script para ping con RTT en Juniper")
+parser.add_argument("--count", type=int, required=True, help="Número de paquetes de ping por host")
+args = parser.parse_args()
+
+TIMEOUT_RPC = 100
+COUNT = args.count
+
 # Lista fija de hosts
 HOSTS_LIST = [
     "201.154.139.1"
@@ -18,12 +26,12 @@ def log_warning(message):
 def log_error(message):
     jcs.syslog("external.crit", f"[ERROR] {message}")
 
-def ping_host(dev, host, count):
+def ping_host(dev, host):
     """Realiza ping y muestra RTT detallado."""
-    log_warning(f"Iniciando ping a {host} con {count} paquetes")
+    log_warning(f"Iniciando ping a {host} con {COUNT} paquetes")
 
     try:
-        result = dev.rpc.ping(host=host, count=str(count))
+        result = dev.rpc.ping(host=host, count=str(COUNT))
 
         target_host = result.findtext("target-host", host).strip()
         rtt_min = result.findtext("probe-results-summary/rtt-minimum", "N/A").strip()
@@ -39,19 +47,19 @@ def ping_host(dev, host, count):
     except Exception as e:
         log_error(f"Fallo el ping a {host} | Hora: {Junos_Context.get('localtime', 'N/A')} | Detalle: {str(e)}")
 
-def run_ping_tests(count):
+def run_ping_tests():
     """Conecta al equipo y realiza pruebas de conectividad."""
     log_warning("Conectando con el dispositivo Juniper...")
 
     start_time = time.time()
     try:
-        with Device() as dev:
+        with Device(timeout=TIMEOUT_RPC) as dev:
             log_warning("Conexión establecida correctamente")
             log_warning(f"Timeout RPC por defecto: {dev.timeout} segundos")
 
             for host in HOSTS_LIST:
                 log_warning(f"Procesando host: {host}")
-                ping_host(dev, host, count)
+                ping_host(dev, host)
 
             log_warning("Finalización de pruebas de conectividad")
 
@@ -62,11 +70,7 @@ def run_ping_tests(count):
     log_warning(f"Tiempo total de ejecución: {total_time} segundos")
 
 def main():
-    parser = argparse.ArgumentParser(description="Script para ping con RTT en Juniper")
-    parser.add_argument("-count", type=int, required=True, help="Número de paquetes de ping por host")
-    args = parser.parse_args()
-
-    run_ping_tests(args.count)
+    run_ping_tests()
 
 if __name__ == "__main__":
     main()
