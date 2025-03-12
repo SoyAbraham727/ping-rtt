@@ -6,12 +6,11 @@ import time
 from jnpr.junos import Device
 from junos import Junos_Context
 
-# Argumentos del script
+
 parser = argparse.ArgumentParser(description="Script para ping con RTT en Juniper")
 parser.add_argument("--count", type=int, required=True, help="Número de paquetes de ping por host")
 args = parser.parse_args()
 
-# Configuraciones
 TIMEOUT_RPC = 100
 COUNT = args.count
 
@@ -27,7 +26,6 @@ def log_warning(message):
 def log_error(message):
     jcs.syslog("external.crit", f"[ERROR] {message}")
 
-# Función para ejecutar ping
 def ping_host(dev, host):
     """Realiza ping y muestra RTT detallado."""
     log_warning(f"Iniciando ping a {host} con {COUNT} paquetes")
@@ -49,26 +47,21 @@ def ping_host(dev, host):
     except Exception as e:
         log_error(f"Fallo el ping a {host} | Hora: {Junos_Context.get('localtime', 'N/A')} | Detalle: {str(e)}")
 
-# Función principal de pruebas de conectividad
 def run_ping_tests():
     """Conecta al equipo y realiza pruebas de conectividad."""
     log_warning("Conectando con el dispositivo Juniper...")
 
     start_time = time.time()
     try:
-        dev = Device()
-        dev.timeout = TIMEOUT_RPC  # ← Timeout manualmente establecido
-        dev.open()
+        with Device(timeout=TIMEOUT_RPC) as dev:
+            log_warning("Conexión establecida correctamente")
+            log_warning(f"Timeout RPC por defecto: {dev.timeout} segundos")
 
-        log_warning("Conexión establecida correctamente")
-        log_warning(f"Timeout RPC configurado: {dev.timeout} segundos")
+            for host in HOSTS_LIST:
+                log_warning(f"Procesando host: {host}")
+                ping_host(dev, host)
 
-        for host in HOSTS_LIST:
-            log_warning(f"Procesando host: {host}")
-            ping_host(dev, host)
-
-        log_warning("Finalización de pruebas de conectividad")
-        dev.close()
+            log_warning("Finalización de pruebas de conectividad")
 
     except Exception as e:
         log_error(f"No se pudo conectar con el dispositivo: {str(e)}")
@@ -76,7 +69,6 @@ def run_ping_tests():
     total_time = round(time.time() - start_time, 2)
     log_warning(f"Tiempo total de ejecución: {total_time} segundos")
 
-# Ejecución principal
 def main():
     run_ping_tests()
 
