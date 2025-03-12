@@ -15,15 +15,15 @@ HOSTS_LIST = [
     "201.154.139.1"
 ]
 
-def log_info(message):
-    jcs.syslog("external.info", f"[INFO] {message}")
+def log_warning(message):
+    jcs.syslog("external.warn", f"[WARNING] {message}")
 
 def log_error(message):
     jcs.syslog("external.crit", f"[ERROR] {message}")
 
 def ping_host(dev, host):
     """Ejecuta ping hacia un host desde el dispositivo."""
-    log_info(f"Iniciando ping a {host} con {COUNT} paquetes")
+    log_warning(f"Iniciando ping a {host} con {COUNT} paquetes")
 
     try:
         result = dev.rpc.ping(host=host, count=str(COUNT))
@@ -32,7 +32,7 @@ def ping_host(dev, host):
         rtt_avg = result.findtext("probe-results-summary/rtt-average", "N/A").strip()
         target_host = result.findtext("target-host", host).strip()
 
-        log_info(
+        log_warning(
             f"Ping a {target_host} | Hora: {Junos_Context.get('localtime', 'N/A')} | "
             f"Min: {rtt_min} ms | Max: {rtt_max} ms | Prom: {rtt_avg} ms"
         )
@@ -42,24 +42,24 @@ def ping_host(dev, host):
 
 def run_ping_tests():
     """Establece conexion con el dispositivo y ejecuta pings."""
-    log_info("Conectando con el dispositivo Juniper...")
+    log_warning("Conectando con el dispositivo Juniper...")
     start_time = time.time()
 
     try:
         with Device() as dev:
-            log_info("Conexion establecida correctamente")
+            log_warning("Conexion establecida correctamente")
 
             for host in HOSTS_LIST:
-                log_info(f"Procesando host: {host}")
+                log_warning(f"Procesando host: {host}")
                 ping_host(dev, host)
 
-            log_info("Finalizacion de pruebas de conectividad")
+            log_warning("Finalizacion de pruebas de conectividad")
 
     except Exception as e:
         log_error(f"No se pudo conectar con el dispositivo: {str(e)}")
 
     total_time = round(time.time() - start_time, 2)
-    log_info(f"Tiempo total de ejecucion: {total_time} segundos")
+    log_warning(f"Tiempo total de ejecucion: {total_time} segundos")
 
 def main():
     run_ping_tests()
