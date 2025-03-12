@@ -21,6 +21,9 @@ def log_warning(message):
 def log_error(message):
     jcs.syslog("external.crit", f"[ERROR] {message}")
 
+def log_info(message):
+    jcs.syslog("external.info", f"[INFO] {message}")
+
 def ping_host(dev, host):
     """Ejecuta ping hacia un host desde el dispositivo."""
     log_warning(f"Iniciando ping a {host} con {COUNT} paquetes")
@@ -48,6 +51,7 @@ def run_ping_tests():
     try:
         with Device() as dev:
             log_warning("Conexion establecida correctamente")
+            log_info(f"Timeout RPC por defecto: {dev.timeout} segundos")  # ← Aquí se imprime el timeout
 
             for host in HOSTS_LIST:
                 log_warning(f"Procesando host: {host}")
