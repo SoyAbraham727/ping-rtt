@@ -9,17 +9,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ------------------ Configuración global ------------------
 RPC_TIMEOUT = 90  # Timeout en segundos para los RPC
-DEFAULT_MAX_WORKERS = os.cpu_count() * 4  # Optimizado para I/O-bound
 
 # ------------------ Argumentos CLI ------------------
 parser = argparse.ArgumentParser(description="Script para hacer ping con RTT en Junos (on-box)")
 parser.add_argument("--count", type=int, required=True, help="Número de paquetes de ping por host")
-parser.add_argument("--threads", type=int, default=DEFAULT_MAX_WORKERS,
-                    help=f"Número de hilos para ejecución paralela (por defecto: {DEFAULT_MAX_WORKERS})")
 args = parser.parse_args()
 
 COUNT = args.count
-MAX_WORKERS = args.threads
 
 # ------------------ Lista de hosts ------------------
 HOSTS_LIST = [
@@ -29,6 +25,8 @@ HOSTS_LIST = [
     "31.13.89.52",
     "157.240.19.19"
 ]
+
+MAX_WORKERS = len(HOSTS_LIST)
 
 # ------------------ Función de logging ------------------
 def log_syslog(message, level="info"):
