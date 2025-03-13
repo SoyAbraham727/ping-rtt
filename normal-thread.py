@@ -1,9 +1,7 @@
 import argparse
 import time
-import os
 import jcs
 from jnpr.junos import Device
-from junos import Junos_Context
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from jnpr.junos.exception import RpcTimeoutError
 
@@ -19,7 +17,7 @@ COUNT = args.count
 # ------------------ Lista de hosts ------------------
 HOSTS_LIST = [
     "201.154.139.1"
-]*5
+] * 5  # Ejemplo de 5 pings al mismo host (puedes variar)
 
 # ------------------ Numero de hilos ------------------
 MAX_WORKERS = len(HOSTS_LIST)
@@ -27,7 +25,7 @@ MAX_WORKERS = len(HOSTS_LIST)
 # ------------------ Funcion de log ------------------
 def log_syslog(message, level="info"):
     level_map = {
-        "info": "external.warn",
+        "info": "external.info",
         "warn": "external.warn",
         "error": "external.crit"
     }
@@ -45,23 +43,26 @@ def ping_host(dev_params):
         rtt_max = result.findtext("probe-results-summary/rtt-maximum", "N/A").strip()
         rtt_avg = result.findtext("probe-results-summary/rtt-average", "N/A").strip()
 
+        hora_actual = time.strftime("%Y-%m-%d %H:%M:%S")
         message = (
-            f"[Hilo-{thread_id}] Ping a {target_host} | Hora: {Junos_Context.get('localtime', 'N/A')} | "
+            f"[Hilo-{thread_id}] Ping a {target_host} | Hora: {hora_actual} | "
             f"RTT minimo: {rtt_min} ms | RTT maximo: {rtt_max} ms | RTT promedio: {rtt_avg} ms"
         )
         log_syslog(message, level="info")
         return f"{target_host} | RTT min: {rtt_min} ms | max: {rtt_max} ms | prom: {rtt_avg} ms"
 
     except RpcTimeoutError as e:
+        hora_actual = time.strftime("%Y-%m-%d %H:%M:%S")
         message = (
-            f"[Hilo-{thread_id}] Timeout en ping a {host} | Hora: {Junos_Context.get('localtime', 'N/A')} | Detalle: {str(e)}"
+            f"[Hilo-{thread_id}] Timeout en ping a {host} | Hora: {hora_actual} | Detalle: {str(e)}"
         )
         log_syslog(message, level="error")
         return f"{host} | Timeout"
 
     except Exception as e:
+        hora_actual = time.strftime("%Y-%m-%d %H:%M:%S")
         message = (
-            f"[Hilo-{thread_id}] Error en ping a {host} | Hora: {Junos_Context.get('localtime', 'N/A')} | Detalle: {str(e)}"
+            f"[Hilo-{thread_id}] Error en ping a {host} | Hora: {hora_actual} | Detalle: {str(e)}"
         )
         log_syslog(message, level="error")
         return f"{host} | Error: {str(e)}"
@@ -73,7 +74,7 @@ def main():
     output_messages = []
 
     try:
-        dev = Device(timeout=RPC_TIMEOUT, gather_facts=True)
+        dev = Device(timeout=RPC_TIMEOUT)
         dev.open()
         log_syslog("Conexion establecida con el dispositivo", level="info")
         log_syslog(f"Timeout RPC: {dev.timeout} segundos", level="info")
