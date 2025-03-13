@@ -5,12 +5,14 @@ import jcs
 from jnpr.junos import Device
 from junos import Junos_Context
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from jnpr.junos.exception import RpcTimeoutError
+import multiprocessing
 
 # ------------------ Configuracion global ------------------
-RPC_TIMEOUT = 90  # Timeout en segundos para los RPC
+RPC_TIMEOUT = 90  # Timeout para RPC en segundos
 
 # ------------------ Argumentos CLI ------------------
-parser = argparse.ArgumentParser(description="Script para realizar ping con RTT en Junos (on-box)")
+parser = argparse.ArgumentParser(description="Script para hacer ping con RTT en Junos (on-box)")
 parser.add_argument("--count", type=int, required=True, help="Numero de paquetes de ping por host")
 args = parser.parse_args()
 COUNT = args.count
@@ -24,11 +26,11 @@ HOSTS_LIST = [
     "157.240.19.19"
 ]
 
-# ------------------ Calculo optimo de workers ------------------
-CPU_COUNT = os.cpu_count() or 4
-MAX_WORKERS = min(len(HOSTS_LIST), CPU_COUNT * 2)
+# ------------------ Determinar numero optimo de hilos ------------------
+CPU_CORES = multiprocessing.cpu_count()
+MAX_WORKERS = min(len(HOSTS_LIST), CPU_CORES)
 
-# ------------------ Funcion de logging ------------------
+# ------------------ Funcion de log ------------------
 def log_syslog(message, level="info"):
     level_map = {
         "info": "external.warn",
@@ -37,11 +39,11 @@ def log_syslog(message, level="info"):
     }
     jcs.syslog(level_map.get(level, "external.info"), message)
 
-# ------------------ Funcion para ejecutar ping ------------------
+# ------------------ Funcion para hacer ping ------------------
 def ping_host(dev_params):
     dev, host, count = dev_params
     try:
-        result = dev.rpc.ping(host=host, count=str(count))
+        result = dev.rpc.ping(host=host, count=str(count), timeout=str(RPC_TIMEOUT))
 
         target_host = result.findtext("target-host", host).strip()
         rtt_min = result.findtext("probe-results-summary/rtt-minimum", "N/A").strip()
@@ -50,14 +52,22 @@ def ping_host(dev_params):
 
         message = (
             f"Ping a {target_host} | Hora: {Junos_Context.get('localtime', 'N/A')} | "
-            f"RTT Min: {rtt_min} ms | Max: {rtt_max} ms | Prom: {rtt_avg} ms"
+            f"Min: {rtt_min} ms | Max: {rtt_max} ms | Prom: {rtt_avg} ms"
         )
         log_syslog(message, level="info")
         return message
 
+    except RpcTimeoutError as e:
+        message = (
+            f"Timeout en ping a {host} | Hora: {Junos_Context.get('localtime', 'N/A')} | "
+            f"Detalle: {str(e)}"
+        )
+        log_syslog(message, level="error")
+        return message
+
     except Exception as e:
         message = (
-            f"Error al hacer ping a {host} | Hora: {Junos_Context.get('localtime', 'N/A')} | "
+            f"Error general en ping a {host} | Hora: {Junos_Context.get('localtime', 'N/A')} | "
             f"Detalle: {str(e)}"
         )
         log_syslog(message, level="error")
@@ -67,13 +77,14 @@ def ping_host(dev_params):
 def main():
     log_syslog("Inicio de pruebas de conectividad", level="info")
     start_time = time.time()
+    output_messages = []
 
     try:
-        dev = Device(timeout=RPC_TIMEOUT)
+        dev = Device(timeout=RPC_TIMEOUT, gather_facts=False)
         dev.open()
-        log_syslog("Conexion abierta con el dispositivo", level="info")
+        log_syslog("Conexion establecida con el dispositivo", level="info")
         log_syslog(f"Timeout RPC: {dev.timeout} segundos", level="info")
-        log_syslog(f"Numero de hilos (workers): {MAX_WORKERS}", level="info")
+        log_syslog(f"Numero de hilos paralelos: {MAX_WORKERS}", level="info")
 
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = {
@@ -82,6 +93,7 @@ def main():
 
             for future in as_completed(futures):
                 msg = future.result()
+                output_messages.append(msg)
 
         dev.close()
         log_syslog("Conexion cerrada con el dispositivo", level="info")
@@ -91,7 +103,7 @@ def main():
         log_syslog(f"Tiempo total de ejecucion: {duration} segundos", level="info")
 
     except Exception as e:
-        log_syslog(f"Error al conectar con el dispositivo: {str(e)}", level="error")
+        log_syslog(f"Fallo al conectar con el dispositivo: {str(e)}", level="error")
 
 # ------------------ Entrada principal ------------------
 if __name__ == "__main__":
