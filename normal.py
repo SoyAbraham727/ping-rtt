@@ -3,6 +3,7 @@ import time
 import jcs
 from jnpr.junos import Device
 from junos import Junos_Context
+from lxml import etree
 
 # ------------------ Configuracion global ------------------
 RPC_TIMEOUT = 90  # Timeout en segundos para los RPC
@@ -37,6 +38,8 @@ def ping_host(dev, host, count):
     try:
         result = dev.rpc.ping(host=host, count=str(count))
 
+        print(etree.tostring(result, pretty_print=True).decode())
+        
         target_host = result.findtext("target-host", host).strip()
         rtt_min = result.findtext("probe-results-summary/rtt-minimum", "N/A").strip()
         rtt_max = result.findtext("probe-results-summary/rtt-maximum", "N/A").strip()
