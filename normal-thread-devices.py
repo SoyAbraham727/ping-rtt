@@ -41,6 +41,7 @@ def ping_host_with_connection(host, count):
         log_syslog(f"Conexión abierta para host: {host}", level="info")
 
         result = dev.rpc.ping(host=host, count=str(count))
+        print(etree.tostring(result, pretty_print=True).decode())
 
         target_host = result.findtext("target-host", host).strip()
         rtt_min = result.findtext("probe-results-summary/rtt-minimum", "N/A").strip()
